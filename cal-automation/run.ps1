@@ -5,11 +5,12 @@ Write-Host "Cal.com webhook received"
 # -----------------------------
 # Config
 # -----------------------------
-[string]$CalApiBase       = "https://api.cal.com/v2"
-[string]$SalesGuestEmail  = "Sandra.Murray@altra.cloud"   # CHANGE IF NEEDED
-[string]$SalesGuestName   = "Sales Team"
+[string]$CalApiBase      = "https://api.cal.com/v2"
+[string]$SalesGuestEmail = "Sandra.Murray@altra.cloud"
+[string]$SalesGuestName  = "Sales Team"
 
-$ApiKey = $env:CAL_API_Key
+# IMPORTANT: exact casing
+$ApiKey = $env:CAL_API_KEY
 if (-not $ApiKey) {
     Write-Host "CAL_API_KEY not set"
     return @{
@@ -23,16 +24,32 @@ if (-not $ApiKey) {
 # -----------------------------
 $body = $Request.Body
 
-if (-not $body -or -not $body.booking -or -not $body.booking.uid) {
-    Write-Host "Invalid webhook payload"
+# Temporary raw logging (keep this until confirmed working)
+Write-Host "RAW WEBHOOK BODY:"
+$body | ConvertTo-Json -Depth 10 | Write-Host
+
+# -----------------------------
+# Extract booking UID safely
+# -----------------------------
+$bookingUid =
+    $body.booking.uid `
+    ?? $body.payload.booking.uid `
+    ?? $body.data.uid `
+    ?? $body.payload.uid
+
+$eventTitle =
+    $body.booking.title `
+    ?? $body.payload.booking.title `
+    ?? $body.data.eventType.title `
+    ?? "Unknown Event"
+
+if (-not $bookingUid) {
+    Write-Host "Booking UID not found in payload"
     return @{
         status = 400
-        body   = "Invalid webhook payload"
+        body   = "Booking UID missing"
     }
 }
-
-[string]$bookingUid = $body.booking.uid
-[string]$eventTitle = $body.booking.title
 
 Write-Host ("Processing booking UID: {0}" -f $bookingUid)
 Write-Host ("Event title: {0}" -f $eventTitle)
@@ -41,13 +58,13 @@ Write-Host ("Event title: {0}" -f $eventTitle)
 # Build headers
 # -----------------------------
 $headers = @{
-    "Authorization"   = ("Bearer {0}" -f $ApiKey)
+    Authorization     = "Bearer $ApiKey"
     "Content-Type"    = "application/json"
-    "cal-api-version" = "2"
+    "cal-api-version" = "2024-08-13"
 }
 
 # -----------------------------
-# Build guest payload
+# Guest payload
 # -----------------------------
 $guestPayload = @{
     email = $SalesGuestEmail
@@ -55,13 +72,10 @@ $guestPayload = @{
 } | ConvertTo-Json -Depth 3
 
 # -----------------------------
-# Build request URI safely
-# -----------------------------
-$uri = "{0}/bookings/{1}/guests" -f $CalApiBase, $bookingUid
-
-# -----------------------------
 # Call Cal.com API
 # -----------------------------
+$uri = "$CalApiBase/bookings/$bookingUid/guests"
+
 try {
     Invoke-RestMethod `
         -Method Post `
@@ -74,7 +88,6 @@ try {
 catch {
     Write-Host "Guest add failed or already exists"
     Write-Host $_.Exception.Message
-    # Intentionally swallow errors to prevent webhook retries
 }
 
 # -----------------------------
