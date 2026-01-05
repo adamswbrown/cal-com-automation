@@ -9,7 +9,7 @@ Write-Host "Cal.com webhook received"
 [string]$SalesGuestEmail  = "Sandra.Murray@altra.cloud"   # CHANGE IF NEEDED
 [string]$SalesGuestName   = "Sales Team"
 
-$ApiKey = $env:CAL_API_KEY
+$ApiKey = $env:CAL_API_Key
 if (-not $ApiKey) {
     Write-Host "CAL_API_KEY not set"
     return @{
