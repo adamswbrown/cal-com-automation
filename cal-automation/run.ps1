@@ -86,8 +86,13 @@ try {
     Write-Host "Guest added successfully"
 }
 catch {
-    Write-Host "Guest add failed or already exists"
-    Write-Host $_.Exception.Message
+    Write-Host "Guest add failed"
+    if ($_.Exception.Response) {
+        $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+        $reader.ReadToEnd() | Write-Host
+    } else {
+        Write-Host $_.Exception.Message
+    }
 }
 
 # -----------------------------
