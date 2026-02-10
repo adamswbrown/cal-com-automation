@@ -7,12 +7,25 @@ Write-Host "Cal.com webhook received"
 # -----------------------------
 $CalApiBase = "https://api.cal.com/v2"
 
-$GuestsToAdd = @(
+$DefaultGuestsToAdd = @(
     @{
         email = "Sandra.Murray@altra.cloud"
         name  = "Sandra Murray"
     }
 )
+
+$WhiteGloveGuestsToAdd = @(
+    @{
+        email = "luke.lloyd@altra.cloud"
+        name  = "Luke Lloyd"
+    },
+    @{
+        email = "Joey.Undis@altra.cloud"
+        name  = "Joey Undis"
+    }
+)
+
+$WhiteGloveSlug = "dr-migrate-white-glove-kickoff"
 
 $ApiKey = $env:CAL_API_KEY
 if (-not $ApiKey) {
@@ -40,6 +53,25 @@ if (-not $bookingUid) {
 }
 
 Write-Host "Processing booking UID: $bookingUid"
+
+# Add extra people for white glove kickoff bookings.
+$GuestsToAdd = @($DefaultGuestsToAdd)
+$whiteGloveSignalFields = @(
+    [string]$body.payload.eventType.slug,
+    [string]$body.payload.eventType.title,
+    [string]$body.payload.eventType.name,
+    [string]$body.payload.eventTypeUrl,
+    [string]$body.payload.bookingUrl,
+    [string]$body.payload.location
+)
+$isWhiteGloveBooking = ($whiteGloveSignalFields | Where-Object {
+    $_ -and $_.ToLower().Contains($WhiteGloveSlug)
+}).Count -gt 0
+
+if ($isWhiteGloveBooking) {
+    Write-Host "White glove kickoff booking detected, adding Luke and Joey"
+    $GuestsToAdd += $WhiteGloveGuestsToAdd
+}
 
 # -----------------------------
 # Headers (CRITICAL)
