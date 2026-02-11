@@ -3,8 +3,17 @@ param($Request, $TriggerMetadata)
 # -----------------------------
 # Logging helpers
 # -----------------------------
-$invocationId = [string]$TriggerMetadata.sys.RandGuid
-if (-not $invocationId) {
+$invocationIdCandidates = @(
+    [string]$TriggerMetadata.InvocationId,
+    [string]$TriggerMetadata.sys.InvocationId,
+    [string]$TriggerMetadata.sys.RandGuid,
+    [string]$Request.Headers.'x-functions-request-id',
+    [string]$Request.Headers.'x-ms-request-id'
+)
+$invocationId = $invocationIdCandidates |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+    Select-Object -First 1
+if ([string]::IsNullOrWhiteSpace($invocationId)) {
     $invocationId = [guid]::NewGuid().ToString()
 }
 
