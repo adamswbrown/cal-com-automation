@@ -1,0 +1,23 @@
+name: Poll Cal.com bookings and add guests
+
+on:
+  schedule:
+    # Every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+
+      - name: Poll and add guests
+        env:
+          CAL_API_KEY: ${{ secrets.CAL_API_KEY }}
+          LOOKBACK_MINUTES: '15'
+        run: bash poll-bookings/poll-and-add-guests.sh
