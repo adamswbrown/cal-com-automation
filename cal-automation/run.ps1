@@ -55,6 +55,8 @@ Write-StructuredLog -Level "Information" -Event "WebhookReceived" -Data @{
 $CalApiBase = "https://api.cal.com/v2"
 
 Import-Module CalGuestRules -ErrorAction Stop
+Import-Module NotionRules -ErrorAction Stop
+Import-Module NotionAlert -ErrorAction Stop
 
 $ApiKey = $env:CAL_API_KEY
 if (-not $ApiKey) {
@@ -97,9 +99,28 @@ Write-StructuredLog -Level "Information" -Event "ProcessingBooking" -Data @{
 }
 
 # Guest selection is owned by the CalGuestRules module so the webhook and the
-# reconciler cannot drift apart.
+# reconciler cannot drift apart. Rules come from Notion, falling back to the
+# built-in set if it is unreachable -- a rules failure must not stop a booking
+# getting its guests.
 $normalisedBooking = ConvertFrom-CalWebhookPayload -Payload $body.payload
-$GuestsToAdd = @(Get-ExpectedGuests -Booking $normalisedBooking)
+
+$rulesResult = Get-NotionGuestRules -Token $env:NOTION_TOKEN -DatabaseId $env:NOTION_RULES_DB_ID
+
+if ($rulesResult.Fallback) {
+    Write-StructuredLog -Level "Error" -Event "RulesFellBack" -Data @{
+        bookingUid = $bookingUid
+        reason     = $rulesResult.Error
+        source     = $rulesResult.Source
+    }
+}
+else {
+    Write-StructuredLog -Level "Information" -Event "RulesLoaded" -Data @{
+        source    = $rulesResult.Source
+        ruleCount = @($rulesResult.Rules).Count
+    }
+}
+
+$GuestsToAdd = @(Get-ExpectedGuests -Booking $normalisedBooking -Rules $rulesResult.Rules)
 
 Write-StructuredLog -Level "Information" -Event "GuestSelection" -Data @{
     bookingUid = $bookingUid

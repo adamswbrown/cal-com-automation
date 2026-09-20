@@ -1,0 +1,70 @@
+{
+  "object": "list",
+  "results": [
+    {
+      "object": "page",
+      "id": "3e1ef850-f293-81ed-a736-c04724999935",
+      "properties": {
+        "Rule": { "type": "title", "title": [{ "plain_text": "Always add Sandra" }] },
+        "Active": { "type": "checkbox", "checkbox": true },
+        "Match Type": { "type": "select", "select": { "name": "Always" } },
+        "Match": { "type": "rich_text", "rich_text": [] },
+        "Guests": { "type": "multi_select", "multi_select": [
+          { "name": "Sandra.Murray@altra.cloud" }
+        ] }
+      }
+    },
+    {
+      "object": "page",
+      "id": "3e1ef850-f293-81a4-afc4-e9e7e3381630",
+      "properties": {
+        "Rule": { "type": "title", "title": [{ "plain_text": "White glove sessions" }] },
+        "Active": { "type": "checkbox", "checkbox": true },
+        "Match Type": { "type": "select", "select": { "name": "Slug contains" } },
+        "Match": { "type": "rich_text", "rich_text": [{ "plain_text": "white-glove" }] },
+        "Guests": { "type": "multi_select", "multi_select": [
+          { "name": "luke.lloyd@altra.cloud" },
+          { "name": "Joey.Undis@altra.cloud" }
+        ] }
+      }
+    },
+    {
+      "object": "page",
+      "id": "inactive-row",
+      "properties": {
+        "Rule": { "type": "title", "title": [{ "plain_text": "Retired rule" }] },
+        "Active": { "type": "checkbox", "checkbox": false },
+        "Match Type": { "type": "select", "select": { "name": "Slug contains" } },
+        "Match": { "type": "rich_text", "rich_text": [{ "plain_text": "legacy" }] },
+        "Guests": { "type": "multi_select", "multi_select": [
+          { "name": "old.person@altra.cloud" }
+        ] }
+      }
+    },
+    {
+      "object": "page",
+      "id": "malformed-row",
+      "properties": {
+        "Rule": { "type": "title", "title": [{ "plain_text": "Broken rule" }] },
+        "Active": { "type": "checkbox", "checkbox": true },
+        "Match Type": { "type": "select", "select": null },
+        "Match": { "type": "rich_text", "rich_text": [{ "plain_text": "whatever" }] },
+        "Guests": { "type": "multi_select", "multi_select": [] }
+      }
+    },
+    {
+      "object": "page",
+      "id": "angle-bracket-row",
+      "properties": {
+        "Rule": { "type": "title", "title": [{ "plain_text": "Partner desk" }] },
+        "Active": { "type": "checkbox", "checkbox": true },
+        "Match Type": { "type": "select", "select": { "name": "Customer contains" } },
+        "Match": { "type": "rich_text", "rich_text": [{ "plain_text": "Ecclesiastical" }] },
+        "Guests": { "type": "multi_select", "multi_select": [
+          { "name": "Partner Desk <info@partner.com>" }
+        ] }
+      }
+    }
+  ],
+  "has_more": false
+}

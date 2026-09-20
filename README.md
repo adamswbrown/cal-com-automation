@@ -142,3 +142,67 @@ traces
           missing = tostring(parsed.missingGuests), hoursUntilStart = todouble(parsed.hoursUntilStart)
 | order by timestamp desc
 ```
+
+## Guest rules live in Notion
+
+The rules that decide who gets added are the `Cal Guest Rules` database under
+⚙️ Operations, not code. Both functions read it, cached for the life of the
+worker instance — a change goes live on the next cold start.
+
+| Property | Purpose |
+|---|---|
+| `Rule` | Name, for humans |
+| `Active` | Only ticked rows are evaluated |
+| `Match Type` | `Always`, `Slug contains`, `Slug exact`, `Customer contains` |
+| `Match` | The term to compare. Blank for `Always`. |
+| `Guests` | Multi-select of email addresses |
+| `Notes` | Why the rule exists |
+
+### Guest display names
+
+Names are derived from the address, so you only pick the email:
+
+```
+luke.lloyd@altra.cloud  ->  Luke Lloyd
+```
+
+For an address that does not follow `firstname.lastname`, write the option as
+`Partner Desk <info@partner.com>` instead.
+
+### When Notion is unavailable
+
+Both functions fall back to the built-in rules in
+`Modules/CalGuestRules/CalGuestRules.psm1`, which are kept identical to the
+seeded Notion rows — so a fallback is a no-op rather than a behaviour change.
+The fallback logs `RulesFellBack` at Error level and attempts a Notion alert.
+
+A malformed row is skipped, not fatal: one typo drops that rule, the rest still
+apply. An unknown match type never matches, so a typo adds nobody rather than
+everybody.
+
+## Fallback alerting
+
+The Notion row and comment is the primary alert. It cannot report on Notion
+being down, and it cannot report on the function not running at all — which
+looks identical to everything being fine.
+
+`infra/azure/cal-automation-alerts.bicep` deploys two rules reading Application
+Insights, which the functions write to before touching Notion:
+
+| Rule | Fires when |
+|---|---|
+| `cal-automation-errors` | Any Error-level log, `RulesFellBack`, `ReconcileFailed`, `GuestAddFailed` |
+| `cal-automation-reconciler-silent` | No `ReconcileCompleted` in 3 hours |
+
+The second is the dead-man switch, and the only thing that catches a broken
+deploy or a disabled timer.
+
+### Deploy the alerts
+
+```bash
+az deployment group create \
+  --resource-group cal-booking-automation_group-b946 \
+  --template-file infra/azure/cal-automation-alerts.bicep \
+  --parameters appInsightsResourceId=<APP_INSIGHTS_RESOURCE_ID> \
+               alertEmailAddress=adam@askadam.cloud
+```
