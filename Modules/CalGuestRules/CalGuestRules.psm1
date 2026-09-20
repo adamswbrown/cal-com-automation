@@ -201,6 +201,25 @@ function Get-MissingGuests {
 }
 
 
+function Get-RulesFallbackAlertId {
+    <#
+        .SYNOPSIS
+        Identity for the synthetic "rules could not be read" alert row.
+
+        .DESCRIPTION
+        Write-NotionAlert only comments when it creates a row, which keeps one
+        booking gap to one notification. A fixed id for a recurring synthetic
+        event inverts that: the first failure creates the row, every later one
+        silently updates it, and the alert never fires again.
+
+        Bucketing by UTC date means a continuing outage re-notifies once a day
+        rather than once per sweep or once per lifetime.
+    #>
+    param([datetime]$Now = (Get-Date).ToUniversalTime())
+
+    'rules-fallback-' + $Now.ToUniversalTime().ToString('yyyy-MM-dd')
+}
+
 # -----------------------------------------------------------------------------
 # Notion rule parsing
 #
@@ -307,4 +326,4 @@ function ConvertFrom-NotionRulesResponse {
     @($rules)
 }
 
-Export-ModuleMember -Function ConvertFrom-CalBooking, ConvertFrom-CalWebhookPayload, Get-ExpectedGuests, Get-MissingGuests, Get-BuiltInGuestRules, ConvertTo-GuestDisplayName, ConvertFrom-GuestOption, ConvertFrom-NotionRulesResponse
+Export-ModuleMember -Function ConvertFrom-CalBooking, ConvertFrom-CalWebhookPayload, Get-ExpectedGuests, Get-MissingGuests, Get-BuiltInGuestRules, ConvertTo-GuestDisplayName, ConvertFrom-GuestOption, ConvertFrom-NotionRulesResponse, Get-RulesFallbackAlertId
