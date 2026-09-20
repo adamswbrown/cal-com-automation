@@ -9,6 +9,10 @@
         'ConvertFrom-CalBooking',
         'ConvertFrom-CalWebhookPayload',
         'Get-ExpectedGuests',
-        'Get-MissingGuests'
+        'Get-MissingGuests',
+        'Get-BuiltInGuestRules',
+        'ConvertTo-GuestDisplayName',
+        'ConvertFrom-GuestOption',
+        'ConvertFrom-NotionRulesResponse'
     )
 }
