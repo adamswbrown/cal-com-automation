@@ -1,0 +1,16 @@
+{
+  "uid": "kuHZrB8c9z3x17GX45ycvc",
+  "title": "Partner / Seller Intro Call between Adam Brown and Lance Waidzunas",
+  "start": "2026-09-23T15:30:00.000Z",
+  "end": "2026-09-23T16:00:00.000Z",
+  "status": "accepted",
+  "eventType": { "id": 6153675, "slug": "partner-intro" },
+  "attendees": [
+    { "name": "Lance Waidzunas", "email": "lance.waidzunas@trustedtechteam.com" },
+    { "name": "Sandra Murray", "email": "Sandra.Murray@altra.cloud" }
+  ],
+  "guests": ["Sandra.Murray@altra.cloud"],
+  "bookingFieldsResponses": {
+    "customer_company_name": "TrustedTech"
+  }
+}

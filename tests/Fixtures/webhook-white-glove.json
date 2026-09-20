@@ -1,0 +1,15 @@
+{
+  "triggerEvent": "BOOKING_CREATED",
+  "payload": {
+    "uid": "8QUGCCgAWACpqQBmksPwUw",
+    "title": "White Glove Working Session between Adam Brown and Errol McKenzie",
+    "startTime": "2026-09-25T14:00:00.000Z",
+    "eventType": { "slug": "white-glove-session", "title": "White Glove Working Session" },
+    "attendees": [
+      { "name": "Errol McKenzie", "email": "errolmc@softcat.com" }
+    ],
+    "bookingFieldsResponses": {
+      "customer_company_name": "Ecclesiastical Insurance"
+    }
+  }
+}

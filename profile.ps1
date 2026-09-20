@@ -20,3 +20,11 @@ if ($env:MSI_SECRET) {
 # Enable-AzureRmAlias
 
 # You can also define functions or aliases that can be referenced in any of your PowerShell functions.
+
+# Make shared modules importable by name from every function in this app.
+$modulesPath = Join-Path $PSScriptRoot 'Modules'
+if (Test-Path $modulesPath) {
+    if ($env:PSModulePath -notlike "*$modulesPath*") {
+        $env:PSModulePath = "$modulesPath$([System.IO.Path]::PathSeparator)$env:PSModulePath"
+    }
+}

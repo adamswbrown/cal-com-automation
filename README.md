@@ -92,3 +92,53 @@ az deployment group create \
 ### Optional: pin to Azure Dashboard
 
 From the workbook, use the `Pin` action on each visualization to add them to a shared Azure Portal dashboard.
+
+## Guest Reconciliation
+
+`cal-reconcile` runs hourly and closes gaps the webhook missed — dropped
+deliveries, silently failed API calls, and rule changes that were not applied
+retroactively.
+
+Each run lists upcoming bookings starting within 30 days, compares their guests
+against the rules in `Modules/CalGuestRules`, and:
+
+- adds missing guests when the booking is more than 24 hours away
+- writes a `Needs action` row to Notion and @-mentions Adam when it is closer
+  than that, since adding a guest re-notifies every attendee
+
+Results land in the `Cal Guest Reconciliation` database under ⚙️ Operations.
+
+### Required app settings
+
+| Setting | Purpose |
+|---|---|
+| `CAL_API_KEY` | Cal.com API key (already set) |
+| `NOTION_TOKEN` | Notion integration token |
+| `NOTION_DB_ID` | The Cal Guest Reconciliation database id |
+| `NOTION_MENTION_USER_ID` | Notion user to @-mention |
+| `RECONCILE_WINDOW_DAYS` | Optional, default 30 |
+| `RECONCILE_AUTO_ADD_THRESHOLD_HOURS` | Optional, default 24 |
+
+### Changing who gets added
+
+Edit the rules table in `Modules/CalGuestRules/CalGuestRules.psm1`. Both the
+webhook and the reconciler read it, so there is one place to change and no
+opportunity for the two to drift.
+
+### Running the tests
+
+```bash
+pwsh -NoProfile -c "Invoke-Pester tests/ -Output Detailed"
+```
+
+### Reconciler logs
+
+```kusto
+traces
+| where timestamp > ago(7d)
+| where message has "Reconcile"
+| extend parsed = parse_json(message)
+| project timestamp, event = tostring(parsed.event), bookingUid = tostring(parsed.bookingUid),
+          missing = tostring(parsed.missingGuests), hoursUntilStart = todouble(parsed.hoursUntilStart)
+| order by timestamp desc
+```
