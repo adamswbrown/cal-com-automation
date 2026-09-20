@@ -72,7 +72,7 @@ $WhiteGloveGuestsToAdd = @(
     }
 )
 
-$WhiteGloveSlug = "dr-migrate-white-glove-kickoff"
+$WhiteGloveSlug = "white-glove"
 
 $ApiKey = $env:CAL_API_KEY
 if (-not $ApiKey) {
