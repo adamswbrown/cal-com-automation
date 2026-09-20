@@ -7,23 +7,35 @@
 # This module is imported by both the cal-automation webhook and the
 # cal-reconcile timer, so there is exactly one answer to "who belongs on this
 # booking?" and no way for the two to drift apart.
-$script:GuestRules = @(
-    @{
-        name   = 'always'
-        match  = { param($Booking) $true }
-        guests = @(
+$script:BuiltInRules = @(
+    [pscustomobject]@{
+        name      = 'Always add Sandra'
+        matchType = 'Always'
+        match     = ''
+        guests    = @(
             [pscustomobject]@{ email = 'Sandra.Murray@altra.cloud'; name = 'Sandra Murray' }
         )
     },
-    @{
-        name   = 'white-glove'
-        match  = { param($Booking) $Booking.Slug -like '*white-glove*' }
-        guests = @(
+    [pscustomobject]@{
+        name      = 'White glove sessions'
+        matchType = 'Slug contains'
+        match     = 'white-glove'
+        guests    = @(
             [pscustomobject]@{ email = 'luke.lloyd@altra.cloud'; name = 'Luke Lloyd' },
             [pscustomobject]@{ email = 'Joey.Undis@altra.cloud'; name = 'Joey Undis' }
         )
     }
 )
+
+function Get-BuiltInGuestRules {
+    <#
+        .SYNOPSIS
+        The fallback rule set, used when the Notion table is unreachable or empty.
+        Kept deliberately identical to the seeded Notion rows so a fallback is a
+        no-op rather than a behaviour change.
+    #>
+    @($script:BuiltInRules)
+}
 
 function New-NormalisedBooking {
     param(
@@ -112,18 +124,56 @@ function ConvertFrom-CalWebhookPayload {
         -ActualGuestEmails $emails
 }
 
+function Test-RuleMatchesBooking {
+    <#
+        .SYNOPSIS
+        Evaluates one rule against one booking. Unknown match types never match,
+        so a typo in Notion silently adds nobody rather than adding everybody.
+    #>
+    param(
+        [Parameter(Mandatory)]$Rule,
+        [Parameter(Mandatory)]$Booking
+    )
+
+    switch ($Rule.matchType) {
+        'Always' { return $true }
+        'Slug contains' {
+            if ([string]::IsNullOrWhiteSpace($Rule.match)) { return $false }
+            return ([string]$Booking.Slug).ToLowerInvariant().Contains(([string]$Rule.match).ToLowerInvariant())
+        }
+        'Slug exact' {
+            return ([string]$Booking.Slug) -ieq ([string]$Rule.match)
+        }
+        'Customer contains' {
+            if ([string]::IsNullOrWhiteSpace($Rule.match)) { return $false }
+            if ([string]::IsNullOrWhiteSpace($Booking.CustomerCompany)) { return $false }
+            return ([string]$Booking.CustomerCompany).ToLowerInvariant().Contains(([string]$Rule.match).ToLowerInvariant())
+        }
+        default { return $false }
+    }
+}
+
 function Get-ExpectedGuests {
     <#
         .SYNOPSIS
         Returns every guest the rules say belongs on this booking.
+
+        .PARAMETER Rules
+        The rule set to evaluate. Defaults to the built-in fallback rules so
+        existing callers and tests keep working without a Notion round-trip.
     #>
-    param([Parameter(Mandatory)]$Booking)
+    param(
+        [Parameter(Mandatory)]$Booking,
+        $Rules
+    )
+
+    if (-not $Rules) { $Rules = Get-BuiltInGuestRules }
 
     $expected = [ordered]@{}
 
-    foreach ($rule in $script:GuestRules) {
-        if (& $rule.match $Booking) {
-            foreach ($guest in $rule.guests) {
+    foreach ($rule in @($Rules)) {
+        if (Test-RuleMatchesBooking -Rule $rule -Booking $Booking) {
+            foreach ($guest in @($rule.guests)) {
                 $key = $guest.email.ToLowerInvariant()
                 if (-not $expected.Contains($key)) {
                     $expected[$key] = $guest
@@ -141,10 +191,120 @@ function Get-MissingGuests {
         Returns expected guests not already on the booking. Comparison is
         case-insensitive: Cal.com echoes back whatever casing was submitted.
     #>
-    param([Parameter(Mandatory)]$Booking)
+    param(
+        [Parameter(Mandatory)]$Booking,
+        $Rules
+    )
 
-    @(Get-ExpectedGuests -Booking $Booking |
+    @(Get-ExpectedGuests -Booking $Booking -Rules $Rules |
         Where-Object { $Booking.ActualGuestEmails -notcontains $_.email.ToLowerInvariant() })
 }
 
-Export-ModuleMember -Function ConvertFrom-CalBooking, ConvertFrom-CalWebhookPayload, Get-ExpectedGuests, Get-MissingGuests
+
+# -----------------------------------------------------------------------------
+# Notion rule parsing
+#
+# Pure functions: they take an already-fetched Notion response and turn it into
+# the same rule shape as the built-ins. The HTTP call lives in NotionRules, so
+# everything here stays unit-testable without a network.
+# -----------------------------------------------------------------------------
+
+function ConvertTo-GuestDisplayName {
+    <#
+        .SYNOPSIS
+        Derives a display name from an email local part.
+
+        .DESCRIPTION
+        Altra addresses follow firstname.lastname, so the name is recoverable
+        from the address and nobody has to type it twice. An address with no
+        separator yields the local part title-cased.
+    #>
+    param([Parameter(Mandatory)][string]$Email)
+
+    $local = ($Email -split '@')[0]
+    $parts = $local -split '[._-]+' | Where-Object { $_ }
+
+    $titled = $parts | ForEach-Object {
+        if ($_.Length -eq 1) { $_.ToUpperInvariant() }
+        else { $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1).ToLowerInvariant() }
+    }
+
+    ($titled -join ' ')
+}
+
+function ConvertFrom-GuestOption {
+    <#
+        .SYNOPSIS
+        Turns one multi-select option into an email/name pair.
+
+        .DESCRIPTION
+        A bare address gets a derived name. The "Name <email>" form is the
+        escape hatch for addresses that do not follow firstname.lastname.
+        An option containing no address returns nothing, so one bad entry is
+        skipped rather than poisoning the rule.
+    #>
+    param([Parameter(Mandatory)][string]$Option)
+
+    $trimmed = $Option.Trim()
+
+    if ($trimmed -match '^(?<name>.*?)\s*<(?<email>[^>]+)>$') {
+        $email = $Matches['email'].Trim()
+        $name = $Matches['name'].Trim()
+        if (-not $email.Contains('@')) { return }
+        if (-not $name) { $name = ConvertTo-GuestDisplayName -Email $email }
+        return [pscustomobject]@{ email = $email; name = $name }
+    }
+
+    if (-not $trimmed.Contains('@')) { return }
+
+    [pscustomobject]@{
+        email = $trimmed
+        name  = ConvertTo-GuestDisplayName -Email $trimmed
+    }
+}
+
+function ConvertFrom-NotionRulesResponse {
+    <#
+        .SYNOPSIS
+        Turns a Notion database query response into a rule set.
+
+        .DESCRIPTION
+        Skips inactive rows, rows with no match type, and rows that resolve to no
+        usable guests. One malformed row is dropped rather than failing the whole
+        set, because a single typo should not void every rule.
+    #>
+    param([Parameter(Mandatory)]$Response)
+
+    $rules = @()
+
+    foreach ($row in @($Response.results)) {
+        $props = $row.properties
+        if (-not $props) { continue }
+
+        if ($props.Active.checkbox -ne $true) { continue }
+
+        $matchType = [string]$props.'Match Type'.select.name
+        if ([string]::IsNullOrWhiteSpace($matchType)) { continue }
+
+        $guests = @()
+        foreach ($option in @($props.Guests.multi_select)) {
+            $guest = ConvertFrom-GuestOption -Option ([string]$option.name)
+            if ($guest) { $guests += $guest }
+        }
+        if ($guests.Count -eq 0) { continue }
+
+        $name = [string](@($props.Rule.title).plain_text -join '')
+        $match = [string](@($props.Match.rich_text).plain_text -join '')
+
+        $rules += [pscustomobject]@{
+            name      = $name
+            matchType = $matchType
+            match     = $match
+            guests    = $guests
+        }
+    }
+
+    @($rules)
+}
+
+Export-ModuleMember -Function ConvertFrom-CalBooking, ConvertFrom-CalWebhookPayload, Get-ExpectedGuests, Get-MissingGuests, Get-BuiltInGuestRules, ConvertTo-GuestDisplayName, ConvertFrom-GuestOption, ConvertFrom-NotionRulesResponse

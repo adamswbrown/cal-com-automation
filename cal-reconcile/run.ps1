@@ -1,6 +1,7 @@
 param($Timer)
 
 Import-Module CalGuestRules -ErrorAction Stop
+Import-Module NotionRules -ErrorAction Stop
 Import-Module CalApi -ErrorAction Stop
 Import-Module NotionAlert -ErrorAction Stop
 
@@ -60,6 +61,40 @@ Write-StructuredLog -Level "Information" -Event "ReconcileStarted" -Data @{
 }
 
 # -----------------------------
+# Rules
+# -----------------------------
+$rulesResult = Get-NotionGuestRules -Token $notionToken -DatabaseId $env:NOTION_RULES_DB_ID
+
+if ($rulesResult.Fallback) {
+    # Error level so the Azure Monitor rule catches this even when the Notion
+    # alert below cannot be delivered -- which is exactly the case if Notion
+    # itself is what failed.
+    Write-StructuredLog -Level "Error" -Event "RulesFellBack" -Data @{
+        reason = $rulesResult.Error
+        source = $rulesResult.Source
+    }
+
+    $null = Write-NotionAlert -Token $notionToken -DatabaseId $notionDbId `
+        -MentionUserId $mentionUserId -Status 'Failed' `
+        -Booking ([pscustomobject]@{
+            Uid             = 'rules-fallback'
+            Title           = 'Guest rules could not be read from Notion'
+            Slug            = 'n/a'
+            StartUtc        = (Get-Date).ToUniversalTime()
+            CustomerCompany = ''
+        }) `
+        -Detail $rulesResult.Error
+}
+else {
+    Write-StructuredLog -Level "Information" -Event "RulesLoaded" -Data @{
+        source    = $rulesResult.Source
+        ruleCount = @($rulesResult.Rules).Count
+    }
+}
+
+$rules = $rulesResult.Rules
+
+# -----------------------------
 # Fetch
 # -----------------------------
 try {
@@ -86,7 +121,7 @@ $stats = @{ clean = 0; fixed = 0; reported = 0; failed = 0 }
 foreach ($raw in $bookings) {
     try {
         $booking = ConvertFrom-CalBooking -Booking $raw
-        $missing = @(Get-MissingGuests -Booking $booking)
+        $missing = @(Get-MissingGuests -Booking $booking -Rules $rules)
 
         if ($missing.Count -eq 0) {
             $stats.clean++
