@@ -54,25 +54,7 @@ Write-StructuredLog -Level "Information" -Event "WebhookReceived" -Data @{
 # -----------------------------
 $CalApiBase = "https://api.cal.com/v2"
 
-$DefaultGuestsToAdd = @(
-    @{
-        email = "Sandra.Murray@altra.cloud"
-        name  = "Sandra Murray"
-    }
-)
-
-$WhiteGloveGuestsToAdd = @(
-    @{
-        email = "luke.lloyd@altra.cloud"
-        name  = "Luke Lloyd"
-    },
-    @{
-        email = "Joey.Undis@altra.cloud"
-        name  = "Joey Undis"
-    }
-)
-
-$WhiteGloveSlug = "white-glove"
+Import-Module CalGuestRules -ErrorAction Stop
 
 $ApiKey = $env:CAL_API_KEY
 if (-not $ApiKey) {
@@ -114,29 +96,16 @@ Write-StructuredLog -Level "Information" -Event "ProcessingBooking" -Data @{
     eventTypeName = $eventTypeName
 }
 
-# Add extra people for white glove kickoff bookings.
-$GuestsToAdd = @($DefaultGuestsToAdd)
-$whiteGloveSignalFields = @(
-    [string]$body.payload.eventType.slug,
-    [string]$body.payload.eventType.title,
-    [string]$body.payload.eventType.name,
-    [string]$body.payload.eventTypeUrl,
-    [string]$body.payload.bookingUrl,
-    [string]$body.payload.location
-)
-$isWhiteGloveBooking = ($whiteGloveSignalFields | Where-Object {
-    $_ -and $_.ToLower().Contains($WhiteGloveSlug)
-}).Count -gt 0
-
-if ($isWhiteGloveBooking) {
-    $GuestsToAdd += $WhiteGloveGuestsToAdd
-}
+# Guest selection is owned by the CalGuestRules module so the webhook and the
+# reconciler cannot drift apart.
+$normalisedBooking = ConvertFrom-CalWebhookPayload -Payload $body.payload
+$GuestsToAdd = @(Get-ExpectedGuests -Booking $normalisedBooking)
 
 Write-StructuredLog -Level "Information" -Event "GuestSelection" -Data @{
     bookingUid = $bookingUid
-    isWhiteGloveBooking = $isWhiteGloveBooking
+    slug       = $normalisedBooking.Slug
     guestCount = $GuestsToAdd.Count
-    guests = @($GuestsToAdd | ForEach-Object { [string]$_.email })
+    guests     = @($GuestsToAdd | ForEach-Object { [string]$_.email })
 }
 
 # -----------------------------
