@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: 'Checkout GitHub Action'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1861FC437BE348F8BACAABB7C16E0A99 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A25A2E96C38E49AB8B346A6ADB4E05ED }}
