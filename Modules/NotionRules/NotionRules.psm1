@@ -1,3 +1,9 @@
+# Imported explicitly rather than relying on the caller. A module does not
+# inherit the caller's imports, so Get-BuiltInGuestRules and
+# ConvertFrom-NotionRulesResponse are only resolvable here if this module
+# imports them itself.
+Import-Module (Join-Path $PSScriptRoot '..' 'CalGuestRules' 'CalGuestRules.psd1') -ErrorAction Stop
+
 $script:NotionApiBase = 'https://api.notion.com/v1'
 $script:NotionVersion = '2022-06-28'
 
