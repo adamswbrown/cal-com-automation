@@ -13,6 +13,7 @@
         'Get-BuiltInGuestRules',
         'ConvertTo-GuestDisplayName',
         'ConvertFrom-GuestOption',
-        'ConvertFrom-NotionRulesResponse'
+        'ConvertFrom-NotionRulesResponse',
+        'Get-RulesFallbackAlertId'
     )
 }

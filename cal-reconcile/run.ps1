@@ -77,7 +77,7 @@ if ($rulesResult.Fallback) {
     $null = Write-NotionAlert -Token $notionToken -DatabaseId $notionDbId `
         -MentionUserId $mentionUserId -Status 'Failed' `
         -Booking ([pscustomobject]@{
-            Uid             = 'rules-fallback'
+            Uid             = Get-RulesFallbackAlertId
             Title           = 'Guest rules could not be read from Notion'
             Slug            = 'n/a'
             StartUtc        = (Get-Date).ToUniversalTime()
